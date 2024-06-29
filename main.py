@@ -1,8 +1,7 @@
 import html
-import json
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup
 import requests
 import smtplib
 import ssl
@@ -32,7 +31,7 @@ def get_hot_posts_for_subreddit(subreddit_name):
     # with open(f"{subreddit_name}.json", "w+") as f:
     #     json.dump(posts_data, f, indent=4)
 
-    return {"data": posts_data, "subreddit_url": f"https://www.reddit.com/r/{subreddit_name}"}
+    return {"data": posts_data, "subreddit_url": f"r/{subreddit_name}"}
 
 
 def create_email(full_data):
@@ -42,12 +41,13 @@ def create_email(full_data):
 
     body = soup.find("body")
 
-    for i in range(full_data):
+    for i in range(len(full_data)):
         subreddit_data = full_data[i]["data"]
 
         # creates the subreddit title
-        a = soup.new_tag("a", href=full_data[i]["subreddit_url"])
-        a.string = "".join(full_data[i]["subreddit_url"].split("/")[-2:])
+        a = soup.new_tag("a", href="https://www.reddit.com/" + full_data[i]["subreddit_url"])
+        a.string = full_data[i]["subreddit_url"]
+        print("putting together", a.string)
 
         h1 = soup.new_tag("h1")
         h1.append(a)
@@ -73,26 +73,46 @@ def create_email(full_data):
                 div["style"] = "padding-left: 8em"
                 body.append(contents)
 
-            # adds image
+            # adds image or video
             if "preview" in post:
-                # for some reason, reddit will sometimes give a direct link and sometimes not. this is a redirect that still seems to work
-                if "https://i.redd.it" in post["url_overridden_by_dest"]:
-                    img = soup.new_tag("img", src=post["url_overridden_by_dest"])
+                if "url_overridden_by_dest" in post:
+                    # for some reason, reddit will sometimes give a direct link and sometimes not. this is a redirect that still seems to work
+                    if "i.redd.it" in post["url_overridden_by_dest"]:
+                        img = soup.new_tag("img", src=post["url_overridden_by_dest"])
 
-                    # adds padding to fit with the text
-                    if post["selftext_html"] is not None:
-                        img["style"] = "padding-left: 8em"
-                    body.append(img)
+                        # adds padding to fit with the text
+                        if post["selftext_html"] is not None:
+                            img["style"] = "padding-left: 8em"
+                        body.append(img)
 
-                elif "https://v.redd.it" in post["url_overridden_by_dest"]:
-                    p = soup.new_tag("p", "")
-                    p.string = "video"
+                    elif "v.redd.it" in post["url_overridden_by_dest"]:
+                        p = soup.new_tag("p")
+                        p.string = "video"
 
-                    # adds padding to fit with the text
-                    if post["selftext_html"] is not None:
-                        p["style"] = "padding-left: 8em"
+                        # adds padding to fit with the text
+                        if post["selftext_html"] is not None:
+                            p["style"] = "padding-left: 8em"
+                        body.append(p)
 
-                    body.append(p)
+                    elif "youtube.com" in post["url_overridden_by_dest"] or "youtu.be" in post["url_overridden_by_dest"]:
+                        a = soup.new_tag("a", href=post["url_overridden_by_dest"])
+                        img = soup.new_tag("img", src=post["secure_media"]["oembed"]["thumbnail_url"])
+                        a.append(img)
+
+                        # adds padding to fit with the text
+                        if post["selftext_html"] is not None:
+                            img["style"] = "padding-left: 8em"
+                        body.append(a)
+
+                    else:
+                        a = soup.new_tag("a", href=post["url_overridden_by_dest"])
+                        img = soup.new_tag("img", src=post["thumbnail"])
+                        a.append(img)
+
+                        # adds padding to fit with the text
+                        if post["selftext_html"] is not None:
+                            img["style"] = "padding-left: 8em"
+                        body.append(a)
 
             # handles gallery posts
             if "gallery_data" in post:
