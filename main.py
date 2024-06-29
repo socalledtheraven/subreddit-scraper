@@ -1,3 +1,4 @@
+import html
 import json
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -33,32 +34,53 @@ def get_hot_posts_for_subreddit(subreddit_name):
 
 
 def create_email(posts_data):
-    """
-    <h2>
-        <a href=""></a>
-    </h2>
-    """
-
+    # grabs basic structure
     with open("email.html", "r") as f:
         soup = BeautifulSoup(f.read(), features="html.parser")
 
     body = soup.find("body")
 
+    # adds each post at the time
     for post in posts_data:
+        # creates link
         a = soup.new_tag("a", href="https://www.reddit.com" + post["permalink"])
         a.string = post["title"]
 
+        # creates title
         h2 = soup.new_tag("h2")
         h2.append(a)
 
         body.append(h2)
 
+        # adds text
+        if post["selftext_html"] is not None:
+            contents = BeautifulSoup(html.unescape(post["selftext_html"]), features="html.parser")
+            div = contents.find("div")
+            div["style"] = "padding-left: 4em"
+            body.append(contents)
+
+        # adds image
         if "preview" in post:
-            img = soup.new_tag("img")
-            img.src = post["preview"]["images"][0]["source"]["url"]
+            if "https://i.redd.it" in post["url_overridden_by_dest"]:
+                img = soup.new_tag("img", src=post["url_overridden_by_dest"])
+                body.append(img)
+            elif "https://v.redd.it" in post["url_overridden_by_dest"]:
+                video = soup.new_tag("video", src=post["media"]["reddit_video"]["fallback_url"], controls="")
+                body.append(video)
+
+        # handles gallery posts
+        if "gallery_data" in post:
+            img = soup.new_tag("img", src=link)
             body.append(img)
 
     print(soup.prettify())
+
+
+def get_gallery_first_image(url)
+    r = requests.get(url)
+    soup = BeautifulSoup(r.content, features="html.parser")
+
+    return soup.find("img", attrs={"class": "media-lightbox-img"})
 
 
 def send_email(html):
