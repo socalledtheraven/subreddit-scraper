@@ -61,41 +61,81 @@ def create_email(posts_data):
 
         # adds image
         if "preview" in post:
+            # for some reason, reddit will sometimes give a direct link and sometimes not. this is a redirect that still seems to work
             if "https://i.redd.it" in post["url_overridden_by_dest"]:
                 img = soup.new_tag("img", src=post["url_overridden_by_dest"])
+
+                # adds padding to fit with the text
+                if post["selftext_html"] is not None:
+                    img["style"] = "padding-left: 4em"
                 body.append(img)
+
             elif "https://v.redd.it" in post["url_overridden_by_dest"]:
-                video = soup.new_tag("video", src=post["media"]["reddit_video"]["fallback_url"], controls="")
-                body.append(video)
+                p = soup.new_tag("p", "")
+                p.string = "video"
+
+                # adds padding to fit with the text
+                if post["selftext_html"] is not None:
+                    p["style"] = "padding-left: 4em"
+
+                body.append(p)
 
         # handles gallery posts
         if "gallery_data" in post:
-            img = soup.new_tag("img", src=link)
-            body.append(img)
+            urls = get_gallery_image_urls("https://www.reddit.com" + post["permalink"])
 
-    print(soup.prettify())
+            for url in urls:
+                img = soup.new_tag("img", src=url)
+
+                # adds padding to fit with the text
+                if post["selftext_html"] is not None:
+                    img["style"] = "padding-left: 4em"
+                body.append(img)
+
+        # gets the icon, colour of text and resizes it all to fit
+        comments_icon = soup.new_tag("img", src="reddit_comment.png", width="13px")
+        comments_text = soup.new_tag("p", style="color: #999999 !important;")
+        num_comments = post["num_comments"]
+
+        if num_comments != 1:
+            comments_text.string = f"{num_comments} Comments"
+        else:
+            comments_text.string = f"{num_comments} Comment"
+
+        comments_text.insert(0, comments_icon)
+        body.append(comments_text)
+
+    return soup.prettify()
 
 
-def get_gallery_first_image(url)
+def get_gallery_image_urls(url):
     r = requests.get(url)
     soup = BeautifulSoup(r.content, features="html.parser")
+    imgs = soup.find_all("img", attrs={"class": "media-lightbox-img"})
 
-    return soup.find("img", attrs={"class": "media-lightbox-img"})
+    urls = []
+    for img in imgs:
+        if "src" in img.attrs:
+            urls.append(img["src"])
+        else:
+            urls.append(img["data-lazy-src"])
+
+    return urls
 
 
 def send_email(html):
     with open("password.txt", "r") as f:
         password = f.read()
 
+    # set up the message
     message = MIMEMultipart("alternative")
     message["Subject"] = "Reddit Roundup"
-    message["From"] = sender_email
+    message["From"] = "test"
     message["To"] = receiver_email
     part = MIMEText(html, "html")
     message.attach(part)
 
-    print(message.as_string())
-
+    # set up the email sender
     context = ssl.create_default_context()
     with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
         server.login(sender_email, password)
@@ -109,6 +149,7 @@ def main():
     # get_hot_posts_for_subreddit("feedthebeast")
     with open("feedthebeast.json", "r") as f:
         data = json.load(f)
+    # create_email(data)
     create_email(data)
 
 
