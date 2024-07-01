@@ -1,4 +1,4 @@
-import html
+import html as ht
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from bs4 import BeautifulSoup
@@ -27,11 +27,115 @@ def get_hot_posts_for_subreddit(subreddit_name):
             print("post number " + str(posts))
         i += 1
 
-    # # not permanent, just for caching
-    # with open(f"{subreddit_name}.json", "w+") as f:
-    #     json.dump(posts_data, f, indent=4)
-
     return {"data": posts_data, "subreddit_url": f"r/{subreddit_name}"}
+
+
+def create_image_from_post(post, soup):
+    img = soup.new_tag("img", src=post["url_overridden_by_dest"])
+
+    # adds padding to fit with the text
+    if post["selftext_html"] is not None:
+        img["style"] = "padding-left: 8em"
+
+    return img
+
+
+def create_video_placeholder_from_post(post, soup):
+    p = soup.new_tag("p")
+    p.string = "video"
+
+    # adds padding to fit with the text
+    if post["selftext_html"] is not None:
+        p["style"] = "padding-left: 8em"
+
+    return p
+
+
+def create_youtube_video_from_post(post, soup):
+    a = soup.new_tag("a", href=post["url_overridden_by_dest"])
+    img = soup.new_tag("img", src=post["secure_media"]["oembed"]["thumbnail_url"])
+    a.append(img)
+
+    # adds padding to fit with the text
+    if post["selftext_html"] is not None:
+        img["style"] = "padding-left: 8em"
+
+    return a
+
+
+def create_video_from_post(post, soup):
+    a = soup.new_tag("a", href=post["url_overridden_by_dest"])
+    img = soup.new_tag("img", src=post["thumbnail"])
+    a.append(img)
+
+    # adds padding to fit with the text
+    if post["selftext_html"] is not None:
+        img["style"] = "padding-left: 8em"
+
+    return a
+
+
+def create_gallery_from_post(post, soup):
+    urls = get_gallery_image_urls("https://www.reddit.com" + post["permalink"])
+
+    imgs = []
+    for url in urls:
+        img = soup.new_tag("img", src=url)
+
+        # adds padding to fit with the text
+        if post["selftext_html"] is not None:
+            img["style"] = "padding-left: 8em"
+        imgs.append(img)
+
+    return imgs
+
+
+def create_comments_text(post, soup):
+    # gets the icon, colour of text and resizes it all to fit
+    comments_icon = soup.new_tag("img", src="https://www.redditstatic.com/emaildigest/reddit_comment.png", width="13px")
+    comments_text = soup.new_tag("p", style="color: #999999 !important;")
+    num_comments = post["num_comments"]
+
+    if num_comments != 1:
+        comments_text.string = f"{num_comments} Comments"
+    else:
+        comments_text.string = f"{num_comments} Comment"
+
+    comments_text.insert(0, comments_icon)
+
+    return comments_text
+
+
+def pad_contents(post):
+    contents = BeautifulSoup(ht.unescape(post["selftext_html"]), features="html.parser")
+    div = contents.find("div")
+    div["style"] = "padding-left: 8em"
+
+    return contents
+
+
+def create_post_title(soup, post):
+    # creates link
+    a = soup.new_tag("a", href="https://www.reddit.com" + post["permalink"])
+    a.string = post["title"]
+
+    # creates title
+    h2 = soup.new_tag("h2")
+    h2.append(a)
+
+    return h2
+
+
+def create_subreddit_title(soup, subreddit_url):
+    # creates the subreddit title
+    a = soup.new_tag("a", href="https://www.reddit.com/" + subreddit_url)
+    a.string = subreddit_url
+    print("putting together", a.string)
+
+    h1 = soup.new_tag("h1")
+    h1.append(a)
+
+    return h1
 
 
 def create_email(full_data):
@@ -44,33 +148,17 @@ def create_email(full_data):
     for i in range(len(full_data)):
         subreddit_data = full_data[i]["data"]
 
-        # creates the subreddit title
-        a = soup.new_tag("a", href="https://www.reddit.com/" + full_data[i]["subreddit_url"])
-        a.string = full_data[i]["subreddit_url"]
-        print("putting together", a.string)
-
-        h1 = soup.new_tag("h1")
-        h1.append(a)
-
+        h1 = create_subreddit_title(soup, full_data[i]["subreddit_url"])
         body.append(h1)
 
         # goes through each post
         for post in subreddit_data:
-            # creates link
-            a = soup.new_tag("a", href="https://www.reddit.com" + post["permalink"])
-            a.string = post["title"]
-
-            # creates title
-            h2 = soup.new_tag("h2")
-            h2.append(a)
-
+            h2 = create_post_title(soup, post)
             body.append(h2)
 
             # adds text
             if post["selftext_html"] is not None:
-                contents = BeautifulSoup(html.unescape(post["selftext_html"]), features="html.parser")
-                div = contents.find("div")
-                div["style"] = "padding-left: 8em"
+                contents = pad_contents(post)
                 body.append(contents)
 
             # adds image or video
@@ -78,65 +166,19 @@ def create_email(full_data):
                 if "url_overridden_by_dest" in post:
                     # for some reason, reddit will sometimes give a direct link and sometimes not. this is a redirect that still seems to work
                     if "i.redd.it" in post["url_overridden_by_dest"]:
-                        img = soup.new_tag("img", src=post["url_overridden_by_dest"])
-
-                        # adds padding to fit with the text
-                        if post["selftext_html"] is not None:
-                            img["style"] = "padding-left: 8em"
-                        body.append(img)
-
+                        body.append(create_image_from_post(post, soup))
                     elif "v.redd.it" in post["url_overridden_by_dest"]:
-                        p = soup.new_tag("p")
-                        p.string = "video"
-
-                        # adds padding to fit with the text
-                        if post["selftext_html"] is not None:
-                            p["style"] = "padding-left: 8em"
-                        body.append(p)
-
+                        body.append(create_video_placeholder_from_post(post, soup))
                     elif "youtube.com" in post["url_overridden_by_dest"] or "youtu.be" in post["url_overridden_by_dest"]:
-                        a = soup.new_tag("a", href=post["url_overridden_by_dest"])
-                        img = soup.new_tag("img", src=post["secure_media"]["oembed"]["thumbnail_url"])
-                        a.append(img)
-
-                        # adds padding to fit with the text
-                        if post["selftext_html"] is not None:
-                            img["style"] = "padding-left: 8em"
-                        body.append(a)
-
+                        body.append(create_youtube_video_from_post(post, soup))
                     else:
-                        a = soup.new_tag("a", href=post["url_overridden_by_dest"])
-                        img = soup.new_tag("img", src=post["thumbnail"])
-                        a.append(img)
-
-                        # adds padding to fit with the text
-                        if post["selftext_html"] is not None:
-                            img["style"] = "padding-left: 8em"
-                        body.append(a)
+                        body.append(create_video_from_post(post, soup))
 
             # handles gallery posts
             if "gallery_data" in post:
-                urls = get_gallery_image_urls("https://www.reddit.com" + post["permalink"])
+                body.extend(create_gallery_from_post(post, soup))
 
-                for url in urls:
-                    img = soup.new_tag("img", src=url)
-
-                    # adds padding to fit with the text
-                    if post["selftext_html"] is not None:
-                        img["style"] = "padding-left: 8em"
-                    body.append(img)
-
-            # gets the icon, colour of text and resizes it all to fit
-            comments_icon = soup.new_tag("img", src="https://www.redditstatic.com/emaildigest/reddit_comment.png", width="13px")
-            comments_text = soup.new_tag("p", style="color: #999999 !important;")
-            num_comments = post["num_comments"]
-
-            if num_comments != 1:
-                comments_text.string = f"{num_comments} Comments"
-            else:
-                comments_text.string = f"{num_comments} Comment"
-
-            comments_text.insert(0, comments_icon)
+            comments_text = create_comments_text(post, soup)
             body.append(comments_text)
 
     return soup.prettify()
@@ -157,10 +199,7 @@ def get_gallery_image_urls(url):
     return urls
 
 
-def send_email(html):
-    with open("password.txt", "r") as f:
-        password = f.read()
-
+def create_message(html):
     # set up the message
     message = MIMEMultipart("alternative")
     message["Subject"] = "Reddit Roundup"
@@ -168,6 +207,15 @@ def send_email(html):
     message["To"] = receiver_email
     part = MIMEText(html, "html")
     message.attach(part)
+
+    return message
+
+
+def send_email(html):
+    with open("password.txt", "r") as f:
+        password = f.read()
+
+    message = create_message(html)
 
     # set up the email sender
     context = ssl.create_default_context()
@@ -189,5 +237,4 @@ def main():
     send_email(email)
 
 
-if __name__ == "__main__":
-    main()
+main()
