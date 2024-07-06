@@ -1,7 +1,9 @@
 import html as ht
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from bs4 import BeautifulSoup
+from typing import List
+
+from bs4 import BeautifulSoup, Tag
 import requests
 import smtplib
 import ssl
@@ -10,7 +12,16 @@ sender_email = "cassie.dalrymple3@gmail.com"
 receiver_email = "cassie.dalrymple3@gmail.com"
 
 
-def get_hot_posts_for_subreddit(subreddit_name):
+def get_hot_posts_for_subreddit(subreddit_name: str) -> dict:
+    """
+    Fetches the top 10 hot posts from the specified subreddit, excluding stickied and uninteresting posts.
+
+    Args:
+        subreddit_name (str): The name of the subreddit to fetch posts from.
+
+    Returns:
+        dict: A dictionary containing the subreddit URL and a list of post data.
+    """
     print("Getting hot posts for " + subreddit_name)
     r = requests.get(f"https://www.reddit.com/r/{subreddit_name}/hot.json")
     data = r.json()["data"]["children"]
@@ -30,7 +41,17 @@ def get_hot_posts_for_subreddit(subreddit_name):
     return {"data": posts_data, "subreddit_url": f"r/{subreddit_name}"}
 
 
-def create_image_from_post(post, soup):
+def create_image_from_post(post: dict, soup: BeautifulSoup) -> Tag:
+    """
+    Creates an HTML img tag for a post with an image.
+
+    Args:
+        post (dict): The post data.
+        soup (BeautifulSoup): A BeautifulSoup object to create new tags.
+
+    Returns:
+        Tag: An img tag with the post image.
+    """
     img = soup.new_tag("img", src=post["url_overridden_by_dest"])
 
     # adds padding to fit with the text
@@ -40,7 +61,17 @@ def create_image_from_post(post, soup):
     return img
 
 
-def create_video_placeholder_from_post(post, soup):
+def create_video_placeholder_from_post(post: dict, soup: BeautifulSoup) -> Tag:
+    """
+    Creates a placeholder text for video posts.
+
+    Args:
+        post (dict): The post data.
+        soup (BeautifulSoup): A BeautifulSoup object to create new tags.
+
+    Returns:
+        Tag: A paragraph tag with the placeholder text.
+    """
     p = soup.new_tag("p")
     p.string = "video"
 
@@ -51,7 +82,17 @@ def create_video_placeholder_from_post(post, soup):
     return p
 
 
-def create_youtube_video_from_post(post, soup):
+def create_youtube_video_from_post(post: dict, soup: BeautifulSoup) -> Tag:
+    """
+    Creates an anchor tag for YouTube video posts with a thumbnail image.
+
+    Args:
+        post (dict): The post data.
+        soup (BeautifulSoup): A BeautifulSoup object to create new tags.
+
+    Returns:
+        Tag: An anchor tag with the YouTube video link and thumbnail image.
+    """
     a = soup.new_tag("a", href=post["url_overridden_by_dest"])
     img = soup.new_tag("img", src=post["secure_media"]["oembed"]["thumbnail_url"])
     a.append(img)
@@ -63,7 +104,17 @@ def create_youtube_video_from_post(post, soup):
     return a
 
 
-def create_video_from_post(post, soup):
+def create_video_from_post(post: dict, soup: BeautifulSoup) -> Tag:
+    """
+    Creates an anchor tag for video posts with a thumbnail image.
+
+    Args:
+        post (dict): The post data.
+        soup (BeautifulSoup): A BeautifulSoup object to create new tags.
+
+    Returns:
+        Tag: An anchor tag with the video link and thumbnail image.
+    """
     a = soup.new_tag("a", href=post["url_overridden_by_dest"])
     img = soup.new_tag("img", src=post["thumbnail"])
     a.append(img)
@@ -75,7 +126,17 @@ def create_video_from_post(post, soup):
     return a
 
 
-def create_gallery_from_post(post, soup):
+def create_gallery_from_post(post: dict, soup: BeautifulSoup) -> list[Tag]:
+    """
+    Creates a list of img tags for gallery posts.
+
+    Args:
+        post (dict): The post data.
+        soup (BeautifulSoup): A BeautifulSoup object to create new tags.
+
+    Returns:
+        list[Tag]: A list of img tags for the gallery images.
+    """
     urls = get_gallery_image_urls("https://www.reddit.com" + post["permalink"])
 
     imgs = []
@@ -85,13 +146,24 @@ def create_gallery_from_post(post, soup):
         # adds padding to fit with the text
         if post["selftext_html"] is not None:
             img["style"] = "padding-left: 8em"
+
         imgs.append(img)
 
     return imgs
 
 
-def create_comments_text(post, soup):
-    # gets the icon, colour of text and resizes it all to fit
+def create_comments_text(post: dict, soup: BeautifulSoup) -> Tag:
+    """
+    Creates a paragraph tag displaying the number of comments on the post.
+
+    Args:
+        post (dict): The post data.
+        soup (BeautifulSoup): A BeautifulSoup object to create new tags.
+
+    Returns:
+        Tag: A paragraph tag with the comments count.
+    """
+    # gets the icon, colour of text and resizes it all to fit inline
     comments_icon = soup.new_tag("img", src="https://www.redditstatic.com/emaildigest/reddit_comment.png", width="13px")
     comments_text = soup.new_tag("p", style="color: #999999 !important;")
     num_comments = post["num_comments"]
@@ -106,7 +178,16 @@ def create_comments_text(post, soup):
     return comments_text
 
 
-def pad_contents(post):
+def pad_contents(post: dict) -> BeautifulSoup:
+    """
+    Adds padding to the contents of the post.
+
+    Args:
+        post (dict): The post data.
+
+    Returns:
+        BeautifulSoup: A BeautifulSoup object with padded contents.
+    """
     contents = BeautifulSoup(ht.unescape(post["selftext_html"]), features="html.parser")
     div = contents.find("div")
     div["style"] = "padding-left: 8em"
@@ -114,7 +195,17 @@ def pad_contents(post):
     return contents
 
 
-def create_post_title(soup, post):
+def create_post_title(post: dict, soup: BeautifulSoup) -> Tag:
+    """
+    Creates a header tag for the post title with a link to the post.
+
+    Args:
+        post (dict): The post data.
+        soup (BeautifulSoup): A BeautifulSoup object to create new tags.
+
+    Returns:
+        Tag: An h2 tag with the post title.
+    """
     # creates link
     a = soup.new_tag("a", href="https://www.reddit.com" + post["permalink"])
     a.string = post["title"]
@@ -126,7 +217,17 @@ def create_post_title(soup, post):
     return h2
 
 
-def create_subreddit_title(soup, subreddit_url):
+def create_subreddit_title(soup: BeautifulSoup, subreddit_url: str) -> Tag:
+    """
+    Creates a header tag for the subreddit title with a link to the subreddit.
+
+    Args:
+        soup (BeautifulSoup): A BeautifulSoup object to create new tags.
+        subreddit_url (str): The URL of the subreddit.
+
+    Returns:
+        Tag: An h1 tag with the subreddit title.
+    """
     # creates the subreddit title
     a = soup.new_tag("a", href="https://www.reddit.com/" + subreddit_url)
     a.string = subreddit_url
@@ -138,7 +239,16 @@ def create_subreddit_title(soup, subreddit_url):
     return h1
 
 
-def create_email(full_data):
+def create_email(full_data: list[dict]) -> str:
+    """
+    Creates the HTML content for the email using the subreddit post data.
+
+    Args:
+        full_data (list[dict]): A list of dictionaries containing subreddit and post data.
+
+    Returns:
+        str: The HTML content for the email.
+    """
     # grabs basic structure
     with open("email.html", "r") as f:
         soup = BeautifulSoup(f.read(), features="html.parser")
@@ -153,7 +263,7 @@ def create_email(full_data):
 
         # goes through each post
         for post in subreddit_data:
-            h2 = create_post_title(soup, post)
+            h2 = create_post_title(post, soup)
             body.append(h2)
 
             # adds text
@@ -184,7 +294,16 @@ def create_email(full_data):
     return soup.prettify()
 
 
-def get_gallery_image_urls(url):
+def get_gallery_image_urls(url: str) -> List[str]:
+    """
+    Fetches the URLs of images in a gallery post.
+
+    Args:
+        url (str): The URL of the Reddit post.
+
+    Returns:
+        list[str]: A list of image URLs.
+    """
     r = requests.get(url)
     soup = BeautifulSoup(r.content, features="html.parser")
     imgs = soup.find_all("img", attrs={"class": "media-lightbox-img"})
@@ -199,7 +318,16 @@ def get_gallery_image_urls(url):
     return urls
 
 
-def create_message(html):
+def create_message(html: str) -> MIMEMultipart:
+    """
+    Creates an email message with the given HTML content.
+
+    Args:
+        html (str): The HTML content for the email.
+
+    Returns:
+        MIMEMultipart: The email message.
+    """
     # set up the message
     message = MIMEMultipart("alternative")
     message["Subject"] = "Reddit Roundup"
@@ -211,7 +339,13 @@ def create_message(html):
     return message
 
 
-def send_email(html):
+def send_email(html: str):
+    """
+    Sends an email with the given HTML content.
+
+    Args:
+        html (str): The HTML content for the email.
+    """
     with open("password.txt", "r") as f:
         password = f.read()
 
@@ -228,10 +362,9 @@ def send_email(html):
 
 
 def main():
+    """ Main function to fetch hot posts from subreddits, create the email content, and send the email."""
     subreddits = ["feedthebeast", "singularity", "obsidianmd"]
-    full_data = []
-    for subreddit in subreddits:
-        full_data.append(get_hot_posts_for_subreddit(subreddit))
+    full_data = [get_hot_posts_for_subreddit(subreddit) for subreddit in subreddits]
 
     email = create_email(full_data)
     send_email(email)
