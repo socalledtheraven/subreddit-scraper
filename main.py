@@ -52,7 +52,7 @@ def create_image_from_post(post: dict, soup: BeautifulSoup) -> Tag:
     Returns:
         Tag: An img tag with the post image.
     """
-    img = soup.new_tag("img", src=post["url_overridden_by_dest"])
+    img = soup.new_tag("img", src=post["url_overridden_by_dest"], width=1000)
 
     # adds padding to fit with the text
     if post["selftext_html"] is not None:
@@ -94,7 +94,7 @@ def create_youtube_video_from_post(post: dict, soup: BeautifulSoup) -> Tag:
         Tag: An anchor tag with the YouTube video link and thumbnail image.
     """
     a = soup.new_tag("a", href=post["url_overridden_by_dest"])
-    img = soup.new_tag("img", src=post["secure_media"]["oembed"]["thumbnail_url"])
+    img = soup.new_tag("img", src=post["secure_media"]["oembed"]["thumbnail_url"], width=1000)
     a.append(img)
 
     # adds padding to fit with the text
@@ -116,7 +116,7 @@ def create_video_from_post(post: dict, soup: BeautifulSoup) -> Tag:
         Tag: An anchor tag with the video link and thumbnail image.
     """
     a = soup.new_tag("a", href=post["url_overridden_by_dest"])
-    img = soup.new_tag("img", src=post["thumbnail"])
+    img = soup.new_tag("img", src=post["thumbnail"], width=1000)
     a.append(img)
 
     # adds padding to fit with the text
@@ -141,7 +141,7 @@ def create_gallery_from_post(post: dict, soup: BeautifulSoup) -> list[Tag]:
 
     imgs = []
     for url in urls:
-        img = soup.new_tag("img", src=url)
+        img = soup.new_tag("img", src=url, width=1000)
 
         # adds padding to fit with the text
         if post["selftext_html"] is not None:
@@ -306,7 +306,7 @@ def get_gallery_image_urls(url: str) -> List[str]:
     """
     r = requests.get(url)
     soup = BeautifulSoup(r.content, features="html.parser")
-    imgs = soup.find_all("img", attrs={"class": "media-lightbox-img"})
+    imgs = soup.find_all("img", attrs={"class": "media-lightbox-img", "width": "1000"})
 
     urls = []
     for img in imgs:
