@@ -363,7 +363,7 @@ def send_email(html: str):
 
 def main():
     """ Main function to fetch hot posts from subreddits, create the email content, and send the email."""
-    subreddits = ["feedthebeast", "singularity", "obsidianmd"]
+    subreddits = ["feedthebeast", "todoist", "obsidianmd"]
     full_data = [get_hot_posts_for_subreddit(subreddit) for subreddit in subreddits]
 
     email = create_email(full_data)
