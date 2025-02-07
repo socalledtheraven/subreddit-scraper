@@ -1,4 +1,5 @@
 import html as ht
+import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import List
@@ -10,6 +11,9 @@ import ssl
 
 sender_email = "cassie.dalrymple3@gmail.com"
 receiver_email = "cassie.dalrymple3@gmail.com"
+header = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0"
+}
 
 
 def get_hot_posts_for_subreddit(subreddit_name: str) -> dict:
@@ -22,8 +26,10 @@ def get_hot_posts_for_subreddit(subreddit_name: str) -> dict:
     Returns:
         dict: A dictionary containing the subreddit URL and a list of post data.
     """
+    time.sleep(3)
     print("Getting hot posts for " + subreddit_name)
-    r = requests.get(f"https://www.reddit.com/r/{subreddit_name}/hot.json")
+    r = requests.get(f"https://www.reddit.com/r/{subreddit_name}/hot.json", headers=header)
+    # print(r.json())
     data = r.json()["data"]["children"]
 
     posts = 0
@@ -304,7 +310,7 @@ def get_gallery_image_urls(url: str) -> List[str]:
     Returns:
         list[str]: A list of image URLs.
     """
-    r = requests.get(url)
+    r = requests.get(url, headers=header)
     soup = BeautifulSoup(r.content, features="html.parser")
     imgs = soup.find_all("img", attrs={"class": "media-lightbox-img", "width": "1000"})
 
@@ -363,7 +369,7 @@ def send_email(html: str):
 
 def main():
     """ Main function to fetch hot posts from subreddits, create the email content, and send the email."""
-    subreddits = ["feedthebeast", "todoist", "obsidianmd", "preppers"]
+    subreddits = ["feedthebeast", "amazingmarvin", "obsidianmd", "preppers"]
     full_data = [get_hot_posts_for_subreddit(subreddit) for subreddit in subreddits]
 
     email = create_email(full_data)
